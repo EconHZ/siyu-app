@@ -336,8 +336,8 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const APP_VERSION = '1.6.1';
-const DB_NAME = 'siyu_db', STORE = 'entries', DB_VER = 1;
+const APP_VERSION = '1.6.2';
+const DB_NAME = 'siyu_db', STORE = 'entries', SELF_STORE = 'self_entries', DAILY_STORE = 'daily_photos', DB_VER = 3;
 const DEFAULT_SEX_TAGS = ['亲吻', '口交', '性交', 'BDSM', '户外'];
 let db = null, currentId = null, currentTags = [], editingId = null;
 let paragraphs = [{ type: 'text', content: '' }];
@@ -369,10 +369,14 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const db2 = e.target.result;
+      // Safe additive migration only: never delete or clear old stores.
       if (!db2.objectStoreNames.contains(STORE)) db2.createObjectStore(STORE, { keyPath: 'id' });
+      if (!db2.objectStoreNames.contains(SELF_STORE)) db2.createObjectStore(SELF_STORE, { keyPath: 'id' });
+      if (!db2.objectStoreNames.contains(DAILY_STORE)) db2.createObjectStore(DAILY_STORE, { keyPath: 'id' });
     };
     req.onsuccess = e => { db = e.target.result; res(db); };
     req.onerror = e => rej(e.target.error);
+    req.onblocked = () => rej(new Error('数据库被其他页面占用，请关闭其它私语页面后重试'));
   });
 }
 function dbGetAll() {
@@ -744,16 +748,51 @@ async function importBackup(event) {
   if (!file) return;
   try {
     const text = await file.text();
-    const backup = JSON.parse(text);
-    if (!backup || backup.dbName !== DB_NAME || !backup.data) { showToast('备份文件不匹配'); return; }
+    let backup;
+    try { backup = JSON.parse(text); }
+    catch (parseErr) { showToast('导入失败：JSON 格式无效'); return; }
+
+    // Accept both the official backup shape and a plain array of diary rows.
+    let data = null;
+    let localSettings = {};
+    if (backup && backup.dbName === DB_NAME && backup.data && typeof backup.data === 'object') {
+      data = backup.data;
+      localSettings = backup.localSettings || {};
+    } else if (Array.isArray(backup)) {
+      data = { [STORE]: backup };
+    } else if (backup && Array.isArray(backup.entries)) {
+      data = { [STORE]: backup.entries };
+      if (Array.isArray(backup.self_entries)) data[SELF_STORE] = backup.self_entries;
+      if (Array.isArray(backup.daily_photos)) data[DAILY_STORE] = backup.daily_photos;
+      localSettings = backup.localSettings || {};
+    } else {
+      showToast('备份文件不匹配：请选择私语导出的 JSON');
+      return;
+    }
+
     if (!confirm('导入会把备份中的记录合并进当前数据；同 ID 记录会被备份覆盖。继续吗？')) return;
-    for (const [storeName, rows] of Object.entries(backup.data)) await putManyToStore(storeName, rows);
-    Object.entries(backup.localSettings || {}).forEach(([k, v]) => {
+    let importedCount = 0;
+    for (const [storeName, rows] of Object.entries(data)) {
+      if (!Array.isArray(rows)) continue;
+      if (!db.objectStoreNames.contains(storeName)) continue;
+      await putManyToStore(storeName, rows);
+      importedCount += rows.filter(row => row && row.id != null).length;
+    }
+    Object.entries(localSettings).forEach(([k, v]) => {
       if (typeof k === 'string' && k.startsWith('siyu_') && !k.includes('api_key')) localStorage.setItem(k, String(v));
     });
-    showToast('导入完成 ✓');
-    renderList(); renderDailyPhotos(); renderProviderGrid(); renderStyleGrid(); setVersionUI();
-  } catch (err) { console.error(err); showToast('导入失败，请检查 JSON 文件'); }
+    showToast('导入完成：' + importedCount + ' 条 ✓');
+
+    // Refresh available views only. Missing optional feature functions should never make import look failed.
+    if (typeof renderList === 'function') await renderList();
+    if (typeof renderDailyPhotos === 'function') await renderDailyPhotos();
+    if (typeof renderProviderGrid === 'function') renderProviderGrid();
+    if (typeof renderStyleGrid === 'function') renderStyleGrid();
+    if (typeof setVersionUI === 'function') setVersionUI();
+  } catch (err) {
+    console.error('Import error:', err);
+    showToast('导入失败：' + (err.message || '请检查 JSON 文件'));
+  }
 }
 async function checkForUpdate() {
   const status = $('update-status');
