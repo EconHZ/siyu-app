@@ -236,6 +236,15 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+.version-pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--accent); background:var(--accent-light); border:1px solid var(--border); border-radius:999px; padding:5px 10px; }
+.settings-actions { display:grid; grid-template-columns:1fr; gap:10px; width:100%; margin-top:10px; }
+.settings-action-btn { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text2); font-family:'Noto Serif SC', serif; font-size:14px; cursor:pointer; }
+.settings-action-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.settings-action-btn:active { opacity:.72; transform:scale(.98); }
+.update-note { font-size:12px; line-height:1.7; color:var(--text3); }
+#backup-import-input { display:none; }
+
 </style>
 </head>
 <body class="theme-day">
@@ -294,6 +303,39 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
       </div>
       <div class="settings-section-title">续写风格</div><div class="style-grid" id="style-grid"></div><div class="custom-prompt-wrap" id="custom-prompt-wrap"><textarea class="custom-prompt-textarea" id="custom-prompt-input" placeholder="描述你想要的续写风格..."></textarea><button class="custom-prompt-save" onclick="saveCustomPrompt()">保存自定义风格</button></div>
       <div class="settings-section-title">外观</div><div class="settings-card"><div class="settings-row"><div class="settings-row-icon">🎨</div><div class="settings-row-body"><div class="settings-row-label">主题</div><div class="settings-row-desc">白天（白紫）/ 夜晚（黑橙）</div></div><button class="btn-theme" onclick="toggleTheme()" style="flex-shrink:0">☀️</button></div></div>
+      <div class="settings-section-title">版本与备份</div>
+      <div class="settings-card">
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div class="settings-row-icon">🔄</div>
+              <div class="settings-row-body">
+                <div class="settings-row-label">版本刷新</div>
+                <div class="settings-row-desc">固定主屏幕入口，只刷新代码，不清空本地数据</div>
+              </div>
+            </div>
+            <span class="version-pill" id="app-version-pill">v-</span>
+          </div>
+          <div class="settings-actions">
+            <button class="settings-action-btn primary" onclick="checkForUpdate()">检查更新 / 刷新到最新版</button>
+            <div class="update-note" id="update-status">建议每次 GitHub 更新后，在这里点一次检查更新。数据仍保存在同一个 Safari 本地数据库里。</div>
+          </div>
+        </div>
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start">
+          <div style="display:flex;align-items:center;gap:14px;width:100%">
+            <div class="settings-row-icon">🧳</div>
+            <div class="settings-row-body">
+              <div class="settings-row-label">数据备份</div>
+              <div class="settings-row-desc">导出/导入日记、照片与非敏感设置；不会导出 API Key</div>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button class="settings-action-btn" onclick="exportBackup()">导出备份 JSON</button>
+            <button class="settings-action-btn" onclick="document.getElementById('backup-import-input').click()">导入备份 JSON</button>
+            <input id="backup-import-input" type="file" accept="application/json,.json" onchange="importBackup(event)" />
+          </div>
+        </div>
+      </div>
       <div class="settings-section-title">关于</div><div class="settings-card"><div class="settings-row"><div class="settings-row-icon">🌙</div><div class="settings-row-body"><div class="settings-row-label">私语 Dating Journal</div><div class="settings-row-desc">本地存储 · 数据不离开你的设备</div></div></div></div>
     </div>
     <div class="tab-bar"><button class="tab-item" onclick="showView('list')"><span class="tab-icon">📖</span>日记</button><button class="tab-item active" onclick="showView('settings')"><span class="tab-icon">⚙️</span>设置</button></div>
@@ -306,6 +348,7 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
+const APP_VERSION = '1.6.0';
 const DB_NAME = 'siyu_db', STORE = 'entries', DB_VER = 1;
 const DEFAULT_SEX_TAGS = ['亲吻', '口交', '性交', 'BDSM', '户外'];
 let db = null, currentId = null, currentTags = [], editingId = null;
@@ -324,6 +367,18 @@ function escJs(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, 
 function showToast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); }
 function countChars(s) { return (s || '').replace(/\s/g, '').length; }
 function todayStr() { return new Date().toISOString().slice(0,10); }
+function normalizeRefreshUrl() {
+  const params = new URLSearchParams(location.search);
+  if (params.has('siyu_refresh')) {
+    history.replaceState(null, document.title, location.pathname + location.hash);
+  }
+}
+function setVersionUI() {
+  const pill = $('app-version-pill');
+  if (pill) pill.textContent = 'v' + APP_VERSION;
+  localStorage.setItem('siyu_last_app_version', APP_VERSION);
+}
+
 
 function applyTheme(t) {
   document.body.className = 'theme-' + t;
@@ -386,7 +441,7 @@ function showView(name) {
   }
   if (name === 'settings') {
     document.querySelectorAll('.tab-item').forEach(t => { if(t.textContent.includes('设置')) t.classList.add('active'); });
-    loadApiKeyStatus(); renderStyleGrid(); renderProviderGrid();
+    loadApiKeyStatus(); renderStyleGrid(); renderProviderGrid(); setVersionUI();
   }
   if (name === 'form') {
     editingId = null; $('form-title').textContent = '新记录'; $('form-sub').textContent = 'New Entry'; initForm();
@@ -646,10 +701,121 @@ async function exportImage() {
     if (document.fonts) await document.fonts.ready; await new Promise(r => setTimeout(r, 300));
     const canvas = await html2canvas($('export-canvas'), { backgroundColor: currentTheme === 'day' ? '#ffffff' : '#0d0d14', scale: 2, useCORS: true, allowTaint: true, logging: false, width: 750, windowWidth: 900 });
     const dataURL = canvas.toDataURL('image/png');
-    if (isIOS && iosWin && !iosWin.closed) { iosWin.document.open(); iosWin.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>私语长图</title><style>body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:sans-serif}img{max-width:100%;border-radius:8px}.hint{color:#888;font-size:13px;margin-top:14px;text-align:center;line-height:1.7}</style></head><body><img src="${dataURL}" alt="私语长图"><p class="hint">长按图片 → 存储到照片</p></body></html>`); iosWin.document.close(); showToast('长按图片保存到相册 ✓'); }
+    if (isIOS && iosWin && !iosWin.closed) { iosWin.document.open(); iosWin.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>私语长图</title><style>body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:sans-serif}img{max-width:100%;border-radius:8px}.hint{color:#888;font-size:13px;margin-top:14px;text-align:center;line-height:1.7}
+.version-pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--accent); background:var(--accent-light); border:1px solid var(--border); border-radius:999px; padding:5px 10px; }
+.settings-actions { display:grid; grid-template-columns:1fr; gap:10px; width:100%; margin-top:10px; }
+.settings-action-btn { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text2); font-family:'Noto Serif SC', serif; font-size:14px; cursor:pointer; }
+.settings-action-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.settings-action-btn:active { opacity:.72; transform:scale(.98); }
+.update-note { font-size:12px; line-height:1.7; color:var(--text3); }
+#backup-import-input { display:none; }
+
+</style></head><body><img src="${dataURL}" alt="私语长图"><p class="hint">长按图片 → 存储到照片</p></body></html>`); iosWin.document.close(); showToast('长按图片保存到相册 ✓'); }
     else { const a = document.createElement('a'); a.href = dataURL; a.download = `私语_${entry.person}_${entry.date}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast('长图已下载 ✓'); }
   } catch(err) { console.error(err); if (iosWin && !iosWin.closed) iosWin.close(); showToast('生成失败，请重试'); }
   finally { $('loading').classList.remove('show'); }
+}
+
+
+function getAllFromStore(storeName) {
+  return new Promise((res, rej) => {
+    if (!db.objectStoreNames.contains(storeName)) { res([]); return; }
+    const req = db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+function putManyToStore(storeName, rows) {
+  return new Promise((res, rej) => {
+    if (!db.objectStoreNames.contains(storeName)) { res(); return; }
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    (rows || []).forEach(row => { if (row && row.id != null) store.put(row); });
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+function getSafeLocalSettings() {
+  const out = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('siyu_')) continue;
+    if (key.includes('api_key')) continue;
+    out[key] = localStorage.getItem(key);
+  }
+  return out;
+}
+async function exportBackup() {
+  if (!db) { showToast('数据库还没准备好'); return; }
+  const stores = Array.from(db.objectStoreNames);
+  const data = {};
+  for (const name of stores) data[name] = await getAllFromStore(name);
+  const backup = { app: '私语 Dating Journal', appVersion: APP_VERSION, dbName: DB_NAME, dbVersion: db.version, exportedAt: new Date().toISOString(), data, localSettings: getSafeLocalSettings() };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `siyu_backup_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('备份已导出 ✓');
+}
+async function importBackup(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if (!backup || backup.dbName !== DB_NAME || !backup.data) { showToast('备份文件不匹配'); return; }
+    if (!confirm('导入会把备份中的记录合并进当前数据；同 ID 记录会被备份覆盖。继续吗？')) return;
+    for (const [storeName, rows] of Object.entries(backup.data)) await putManyToStore(storeName, rows);
+    Object.entries(backup.localSettings || {}).forEach(([k, v]) => {
+      if (typeof k === 'string' && k.startsWith('siyu_') && !k.includes('api_key')) localStorage.setItem(k, String(v));
+    });
+    showToast('导入完成 ✓');
+    renderList(); renderProviderGrid(); renderStyleGrid(); setVersionUI();
+  } catch (err) { console.error(err); showToast('导入失败，请检查 JSON 文件'); }
+}
+function parseVersionFromHtml(html) {
+  const m = html.match(/const\s+APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  return m ? m[1] : '';
+}
+function compareVersion(a, b) {
+  const pa = String(a).split('.').map(x => parseInt(x, 10) || 0);
+  const pb = String(b).split('.').map(x => parseInt(x, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) { if ((pa[i] || 0) > (pb[i] || 0)) return 1; if ((pa[i] || 0) < (pb[i] || 0)) return -1; }
+  return 0;
+}
+async function checkForUpdate() {
+  const status = $('update-status');
+  if (status) status.textContent = '正在向 GitHub 请求最新版…';
+  try {
+    const base = location.origin + location.pathname.replace(/[^\/]*$/, '');
+    const url = base + 'index.html?siyu_check=' + Date.now();
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+    const latest = parseVersionFromHtml(html);
+    if (!latest) {
+      if (status) status.textContent = '已请求最新版，但无法读取版本号；正在强制刷新。';
+    } else if (compareVersion(latest, APP_VERSION) <= 0) {
+      if (status) status.textContent = `当前已是最新版：v${APP_VERSION}`;
+      showToast('当前已是最新版');
+      return;
+    } else {
+      if (status) status.textContent = `发现新版 v${latest}，正在刷新代码。你的本地数据不会被清空。`;
+    }
+    localStorage.setItem('siyu_pending_refresh_from', APP_VERSION);
+    setTimeout(() => { location.replace(location.pathname + '?siyu_refresh=' + Date.now() + location.hash); }, 500);
+  } catch (err) {
+    console.error(err);
+    if (status) status.textContent = '检查失败：请确认已通过 GitHub Pages/Safari 打开，并且网络可用。';
+    showToast('检查更新失败');
+  }
 }
 
 const AI_STYLES = [
@@ -710,8 +876,10 @@ async function aiContinuePara(idx) {
   finally { btn.classList.remove('loading'); btn.disabled = false; }
 }
 
+normalizeRefreshUrl();
 applyTheme(currentTheme);
-openDB().then(() => { renderList(); renderProviderGrid(); renderStyleGrid(); }).catch(err => { console.error('DB error:', err); showToast('数据库初始化失败'); });
+setVersionUI();
+openDB().then(() => { renderList(); renderProviderGrid(); renderStyleGrid(); setVersionUI(); }).catch(err => { console.error('DB error:', err); showToast('数据库初始化失败'); });
 </script>
 </body>
 </html>
