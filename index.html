@@ -236,6 +236,40 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ── PERSON SCORE CHART ── */
+.score-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px; margin: 16px 0 14px; box-shadow: var(--card-shadow);
+}
+.score-panel-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.score-panel-sub { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+.score-chart-wrap { width: 100%; overflow: hidden; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); }
+.score-chart-svg { width: 100%; height: 180px; display: block; }
+.score-stat-table { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.score-stat-cell { padding: 10px 8px; text-align: center; border-right: 1px solid var(--border); font-size: 13px; color: var(--text2); background: var(--surface); }
+.score-stat-cell:nth-child(2n) { border-right: none; }
+.score-stat-head { color: var(--text3); font-size: 12px; letter-spacing: 0.08em; }
+.score-stat-value { color: var(--accent); font-size: 18px; font-weight: 600; font-family: 'DM Serif Display', 'Noto Serif SC', serif; }
+.score-empty { padding: 22px 12px; text-align: center; color: var(--text3); font-size: 13px; }
+
+/* ── DAILY PHOTO PANEL ── */
+.daily-toolbar { margin: 16px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--card-shadow); }
+.daily-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.daily-nav-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface2); color: var(--accent); font-size: 18px; cursor: pointer; flex-shrink: 0; }
+.daily-date-input { flex: 1; min-width: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: 'Noto Serif SC', serif; font-size: 14px; padding: 10px 12px; outline: none; -webkit-appearance: none; appearance: none; }
+.daily-add-btn { width: 100%; padding: 13px; border-radius: 12px; border: none; background: var(--accent); color: #fff; font-family: 'Noto Serif SC', serif; font-size: 14px; letter-spacing: .05em; cursor: pointer; }
+.daily-summary { margin-top: 10px; color: var(--text3); font-size: 12px; line-height: 1.6; }
+.daily-gallery { padding: 0 16px 96px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.daily-photo-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--card-shadow); animation: fadeUp .3s ease both; }
+.daily-photo-img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; cursor: pointer; }
+.daily-photo-meta { padding: 8px 10px 10px; color: var(--text3); font-size: 11px; display:flex;justify-content:space-between;gap:6px;align-items:center; }
+.daily-delete-btn { position: absolute; top: 7px; right: 7px; width: 28px; height: 28px; border-radius: 50%; border: none; background: rgba(0,0,0,.58); color: #fff; font-size: 14px; cursor: pointer; }
+.photo-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 1200; display: none; align-items: center; justify-content: center; padding: 24px; }
+.photo-lightbox.show { display: flex; }
+.photo-lightbox img { max-width: 100%; max-height: 82vh; border-radius: 14px; display: block; }
+.photo-lightbox-close { position: fixed; top: 18px; right: 18px; width: 42px; height: 42px; border-radius: 50%; border: none; background: rgba(255,255,255,.18); color: #fff; font-size: 24px; cursor: pointer; }
+
 </style>
 </head>
 <body class="theme-day">
@@ -248,10 +282,24 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
       <button class="inner-tab active" id="itab-timeline" onclick="switchInnerTab('timeline')">📖 时间线</button>
       <button class="inner-tab" id="itab-persons" onclick="switchInnerTab('persons')">👤 人物</button>
       <button class="inner-tab" id="itab-labels" onclick="switchInnerTab('labels')">🏷️ 标签</button>
+      <button class="inner-tab" id="itab-daily" onclick="switchInnerTab('daily')">📷 日常</button>
     </div>
     <div id="panel-timeline" class="inner-panel"><div class="list-container" id="list-container"></div></div>
     <div id="panel-persons" class="inner-panel" style="display:none"><div class="list-container" id="persons-container"></div></div>
     <div id="panel-labels" class="inner-panel" style="display:none"><div class="list-container" id="labels-container"></div></div>
+    <div id="panel-daily" class="inner-panel" style="display:none">
+      <div class="daily-toolbar">
+        <div class="daily-date-row">
+          <button class="daily-nav-btn" onclick="shiftDailyDate(-1)">‹</button>
+          <input class="daily-date-input" type="date" id="daily-date" onchange="setDailyDate(this.value)" />
+          <button class="daily-nav-btn" onclick="shiftDailyDate(1)">›</button>
+        </div>
+        <button class="daily-add-btn" onclick="document.getElementById('daily-photo-input').click()">📷 拍照 / 添加到这一天</button>
+        <input type="file" id="daily-photo-input" accept="image/*" capture="environment" style="display:none" onchange="addDailyPhoto(event)" />
+        <div class="daily-summary" id="daily-summary">选择日期后查看当天照片</div>
+      </div>
+      <div class="daily-gallery" id="daily-gallery"></div>
+    </div>
     <div class="tab-bar"><button class="tab-item active" onclick="showView('list')"><span class="tab-icon">📖</span>日记</button><button class="tab-item" onclick="showView('settings')"><span class="tab-icon">⚙️</span>设置</button></div>
   </div>
 
@@ -331,18 +379,20 @@ body.theme-night .ec-footer-date, body.theme-night .ec-footer-logo { color: #3a3
 
   <div class="speech-overlay" id="speech-overlay"><div class="speech-mic">🎤</div><div class="speech-hint">正在听...说话中</div><button class="speech-stop" onclick="stopSpeech()">停止</button></div>
   <div id="export-canvas"><div class="ec-app-name">私语 · Dating Journal</div><div class="ec-person" id="ec-person"></div><div class="ec-meta"><span id="ec-date"></span><span id="ec-location"></span></div><div class="ec-header-line"></div><div class="ec-mood-bar"><span class="ec-mood-label">心情</span><div class="ec-mood-track"><div class="ec-mood-fill" id="ec-mood-fill"></div></div><span class="ec-mood-num" id="ec-mood-num"></span></div><div class="ec-divider"></div><div id="ec-body-container"></div><div class="ec-tags" id="ec-tags"></div><div class="ec-footer"><div class="ec-footer-date" id="ec-footer-date"></div><div class="ec-footer-logo">私语</div></div></div>
+  <div class="photo-lightbox" id="photo-lightbox" onclick="closePhotoLightbox()"><button class="photo-lightbox-close" onclick="closePhotoLightbox();event.stopPropagation();">×</button><img id="photo-lightbox-img" src="" alt="" /></div>
   <div class="toast" id="toast"></div><div class="loading-overlay" id="loading"><div class="spinner"></div><div class="loading-text">生成长图中...</div></div>
 
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.6.4';
 const DB_NAME = 'siyu_db', STORE = 'entries', SELF_STORE = 'self_entries', DAILY_STORE = 'daily_photos', DB_VER = 3;
 const DEFAULT_SEX_TAGS = ['亲吻', '口交', '性交', 'BDSM', '户外'];
 let db = null, currentId = null, currentTags = [], editingId = null;
 let paragraphs = [{ type: 'text', content: '' }];
 let currentSexTags = [];
 let currentInnerTab = 'timeline';
+let dailySelectedDate = localStorage.getItem('siyu_daily_selected_date') || todayStr();
 let currentTheme = localStorage.getItem('siyu_theme') || 'day';
 let mediaRecorder = null, audioChunks = [], recordingIdx = -1, recTimer = null, recSeconds = 0;
 let speechRecognition = null, speechTargetIdx = -1;
@@ -410,6 +460,94 @@ function dbDelete(id) {
   });
 }
 
+
+function dbDailyGetAll() {
+  return new Promise((res, rej) => {
+    const req = db.transaction(DAILY_STORE, 'readonly').objectStore(DAILY_STORE).getAll();
+    req.onsuccess = () => res(req.result.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    req.onerror = e => rej(e.target.error);
+  });
+}
+function dbDailyPut(item) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(DAILY_STORE, 'readwrite');
+    tx.objectStore(DAILY_STORE).put(item);
+    tx.oncomplete = res;
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+function dbDailyDelete(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(DAILY_STORE, 'readwrite');
+    tx.objectStore(DAILY_STORE).delete(id);
+    tx.oncomplete = res;
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+function setDailyDate(val) {
+  if (!val) return;
+  dailySelectedDate = val;
+  localStorage.setItem('siyu_daily_selected_date', dailySelectedDate);
+  renderDailyPhotos();
+}
+function shiftDailyDate(deltaDays) {
+  const d = new Date(dailySelectedDate || todayStr());
+  if (Number.isNaN(d.getTime())) return;
+  d.setDate(d.getDate() + deltaDays);
+  setDailyDate(d.toISOString().slice(0,10));
+}
+async function renderDailyPhotos() {
+  if (!db) return;
+  const dateInput = $('daily-date');
+  if (dateInput && dateInput.value !== dailySelectedDate) dateInput.value = dailySelectedDate;
+  const gallery = $('daily-gallery');
+  const summary = $('daily-summary');
+  if (!gallery) return;
+  const all = await dbDailyGetAll();
+  const list = all.filter(x => x.date === dailySelectedDate);
+  if (summary) summary.textContent = dailySelectedDate + ' · ' + list.length + ' 张照片';
+  if (!list.length) {
+    gallery.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:42px 12px"><div class="icon">📷</div><p>这一天还没有照片<br>点击上方按钮拍照或添加</p></div>';
+    return;
+  }
+  gallery.innerHTML = list.map(item => {
+    const time = item.createdAt ? new Date(item.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `<div class="daily-photo-card"><button class="daily-delete-btn" onclick="deleteDailyPhoto('${escJs(item.id)}')">🗑</button><img class="daily-photo-img" src="${item.photo}" alt="" loading="lazy" onclick="openPhotoLightbox('${escJs(item.photo)}')"><div class="daily-photo-meta"><span>${escHtml(time)}</span><span>${escHtml(item.date || '')}</span></div></div>`;
+  }).join('');
+}
+function addDailyPhoto(event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = '';
+  if (!files.length) return;
+  let done = 0;
+  files.forEach(file => {
+    compressImage(file, async b64 => {
+      const item = { id: Date.now().toString() + '_' + Math.random().toString(36).slice(2,8), date: dailySelectedDate || todayStr(), photo: b64, createdAt: Date.now() };
+      await dbDailyPut(item);
+      done++;
+      if (done === files.length) { showToast('已添加 ' + done + ' 张照片 ✓'); renderDailyPhotos(); }
+    });
+  });
+}
+async function deleteDailyPhoto(id) {
+  if (!confirm('删除这张日常照片？')) return;
+  await dbDailyDelete(id);
+  showToast('已删除');
+  renderDailyPhotos();
+}
+function openPhotoLightbox(src) {
+  const lb = $('photo-lightbox'), img = $('photo-lightbox-img');
+  if (!lb || !img) return;
+  img.src = src;
+  lb.classList.add('show');
+}
+function closePhotoLightbox() {
+  const lb = $('photo-lightbox'), img = $('photo-lightbox-img');
+  if (!lb || !img) return;
+  lb.classList.remove('show');
+  setTimeout(() => { img.src = ''; }, 120);
+}
+
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const view = $('view-' + name); if (view) view.classList.add('active');
@@ -437,6 +575,7 @@ function switchInnerTab(tab) {
   if (tab === 'timeline') renderList();
   if (tab === 'persons') renderPersons();
   if (tab === 'labels') renderLabels();
+  if (tab === 'daily') renderDailyPhotos();
 }
 
 function initForm() {
@@ -602,10 +741,81 @@ async function renderPersons() {
   const persons = Object.keys(map).sort((a,b) => (map[b][0].date || '').localeCompare(map[a][0].date || ''));
   container.innerHTML = persons.map(name => { const list = map[name]; return `<div class="person-card" onclick="openPersonDetail('${escJs(name)}')"><div class="person-avatar">${escHtml((name[0] || '?').toUpperCase())}</div><div class="person-info"><div class="person-name">${escHtml(name)}</div><div class="person-meta">最近：${escHtml(list[0].date)}　共 ${list.length} 篇</div></div><div class="person-count">${list.length} 篇</div></div>`; }).join('');
 }
+function fmtScore(n) {
+  return Number.isFinite(n) ? (Math.round(n * 10) / 10).toFixed(1) : '-';
+}
+
+function buildPersonScorePanel(list) {
+  const valid = list
+    .filter(e => Number.isFinite(Number(e.mood)))
+    .slice()
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || (a.createdAt || 0) - (b.createdAt || 0));
+
+  if (!valid.length) {
+    return `<div class="score-panel"><div class="score-panel-title">近期得分趋势</div><div class="score-empty">暂无可统计的心情得分</div></div>`;
+  }
+
+  const recent = valid.slice(-10);
+  const scores = recent.map(e => Math.max(1, Math.min(5, Number(e.mood))));
+  const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+
+  let pred = null;
+  if (scores.length >= 3) {
+    const last3 = scores.slice(-3);
+    const avgDelta = ((last3[1] - last3[0]) + (last3[2] - last3[1])) / 2;
+    pred = Math.max(1, Math.min(5, last3[2] + avgDelta));
+  }
+
+  const width = 320, height = 180, padL = 30, padR = 24, padT = 22, padB = 28;
+  const yOf = v => padT + (5 - v) / 4 * (height - padT - padB);
+  const countWithPred = scores.length + (pred == null ? 0 : 1);
+  const step = countWithPred <= 1 ? 0 : (width - padL - padR) / (countWithPred - 1);
+  const xOf = i => countWithPred <= 1 ? width / 2 : padL + i * step;
+  const pts = scores.map((s, i) => `${xOf(i)},${yOf(s)}`).join(' ');
+  const circles = scores.map((s, i) => `<circle cx="${xOf(i)}" cy="${yOf(s)}" r="4.2" fill="var(--accent)"></circle>`).join('');
+  const labels = scores.map((s, i) => `<text x="${xOf(i)}" y="${Math.min(height - 8, yOf(s) - 8)}" text-anchor="middle" font-size="10" fill="var(--text2)">${s}</text>`).join('');
+  const grid = [1,2,3,4,5].map(v => `<line x1="${padL}" y1="${yOf(v)}" x2="${width-padR}" y2="${yOf(v)}" stroke="var(--border)" stroke-width="1" opacity="0.75"></line><text x="10" y="${yOf(v)+3}" font-size="10" fill="var(--text3)">${v}</text>`).join('');
+  const dateLabels = recent.map((e, i) => {
+    const d = String(e.date || '').slice(5).replace('-', '/');
+    return `<text x="${xOf(i)}" y="${height - 8}" text-anchor="middle" font-size="9" fill="var(--text3)">${escHtml(d)}</text>`;
+  }).join('');
+
+  let predSvg = '';
+  if (pred != null) {
+    const lastIdx = scores.length - 1;
+    const px = xOf(scores.length), py = yOf(pred);
+    predSvg = `<line x1="${xOf(lastIdx)}" y1="${yOf(scores[lastIdx])}" x2="${px}" y2="${py}" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 5" fill="none"></line><circle cx="${px}" cy="${py}" r="4.2" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></circle><text x="${px}" y="${Math.max(12, py - 8)}" text-anchor="middle" font-size="10" fill="var(--accent)">${fmtScore(pred)}</text><text x="${px}" y="${height - 8}" text-anchor="middle" font-size="9" fill="var(--accent)">预测</text>`;
+  }
+
+  return `<div class="score-panel">
+    <div class="score-panel-title">近期得分趋势</div>
+    <div class="score-panel-sub">仅展示近 10 次记录；虚线为下一次潜在分数</div>
+    <div class="score-chart-wrap">
+      <svg class="score-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="近期得分折线图">
+        ${grid}
+        ${pts ? `<polyline points="${pts}" stroke="var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+        ${predSvg}
+        ${circles}
+        ${labels}
+        ${dateLabels}
+      </svg>
+    </div>
+    <div class="score-stat-table">
+      <div class="score-stat-cell score-stat-head">平均得分</div>
+      <div class="score-stat-cell score-stat-head">预测得分</div>
+      <div class="score-stat-cell score-stat-value">${fmtScore(avg)}</div>
+      <div class="score-stat-cell score-stat-value">${pred == null ? '-' : fmtScore(pred)}</div>
+    </div>
+  </div>`;
+}
+
 async function openPersonDetail(name) {
-  const entries = await dbGetAll(); const list = entries.filter(e => e.person === name);
-  $('pd-name').textContent = name; $('pd-count').textContent = '共 ' + list.length + ' 篇记录';
-  $('pd-list').innerHTML = list.map(e => buildCardHTML(e)).join('') || '<div class="empty-state"><p>没有记录</p></div>';
+  const entries = await dbGetAll();
+  const list = entries.filter(e => e.person === name);
+  $('pd-name').textContent = name;
+  $('pd-count').textContent = '共 ' + list.length + ' 篇记录';
+  const sortedForCards = list.slice().sort((a,b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0));
+  $('pd-list').innerHTML = buildPersonScorePanel(list) + (sortedForCards.map(e => buildCardHTML(e)).join('') || '<div class="empty-state"><p>没有记录</p></div>');
   showView('person');
 }
 async function renderLabels() {
@@ -681,7 +891,24 @@ async function exportImage() {
     if (document.fonts) await document.fonts.ready; await new Promise(r => setTimeout(r, 300));
     const canvas = await html2canvas($('export-canvas'), { backgroundColor: currentTheme === 'day' ? '#ffffff' : '#0d0d14', scale: 2, useCORS: true, allowTaint: true, logging: false, width: 750, windowWidth: 900 });
     const dataURL = canvas.toDataURL('image/png');
-    if (isIOS && iosWin && !iosWin.closed) { iosWin.document.open(); iosWin.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>私语长图</title><style>body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:sans-serif}img{max-width:100%;border-radius:8px}.hint{color:#888;font-size:13px;margin-top:14px;text-align:center;line-height:1.7}</style></head><body><img src="${dataURL}" alt="私语长图"><p class="hint">长按图片 → 存储到照片</p></body></html>`); iosWin.document.close(); showToast('长按图片保存到相册 ✓'); }
+    if (isIOS && iosWin && !iosWin.closed) { iosWin.document.open(); iosWin.document.write(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>私语长图</title><style>body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:sans-serif}img{max-width:100%;border-radius:8px}.hint{color:#888;font-size:13px;margin-top:14px;text-align:center;line-height:1.7}
+/* ── PERSON SCORE CHART ── */
+.score-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px; margin: 16px 0 14px; box-shadow: var(--card-shadow);
+}
+.score-panel-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.score-panel-sub { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+.score-chart-wrap { width: 100%; overflow: hidden; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); }
+.score-chart-svg { width: 100%; height: 180px; display: block; }
+.score-stat-table { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.score-stat-cell { padding: 10px 8px; text-align: center; border-right: 1px solid var(--border); font-size: 13px; color: var(--text2); background: var(--surface); }
+.score-stat-cell:nth-child(2n) { border-right: none; }
+.score-stat-head { color: var(--text3); font-size: 12px; letter-spacing: 0.08em; }
+.score-stat-value { color: var(--accent); font-size: 18px; font-weight: 600; font-family: 'DM Serif Display', 'Noto Serif SC', serif; }
+.score-empty { padding: 22px 12px; text-align: center; color: var(--text3); font-size: 13px; }
+
+</style></head><body><img src="${dataURL}" alt="私语长图"><p class="hint">长按图片 → 存储到照片</p></body></html>`); iosWin.document.close(); showToast('长按图片保存到相册 ✓'); }
     else { const a = document.createElement('a'); a.href = dataURL; a.download = `私语_${entry.person}_${entry.date}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast('长图已下载 ✓'); }
   } catch(err) { console.error(err); if (iosWin && !iosWin.closed) iosWin.close(); showToast('生成失败，请重试'); }
   finally { $('loading').classList.remove('show'); }
@@ -870,7 +1097,7 @@ async function aiContinuePara(idx) {
 }
 
 applyTheme(currentTheme);
-openDB().then(() => { renderList(); renderProviderGrid(); renderStyleGrid(); setVersionUI(); }).catch(err => { console.error('DB error:', err); showToast('数据库初始化失败'); });
+openDB().then(() => { if ($('daily-date')) $('daily-date').value = dailySelectedDate; renderList(); renderProviderGrid(); renderStyleGrid(); setVersionUI(); }).catch(err => { console.error('DB error:', err); showToast('数据库初始化失败'); });
 </script>
 </body>
 </html>
