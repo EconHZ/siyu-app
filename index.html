@@ -1232,6 +1232,31 @@ async function exportImage() {
   const entry = await dbGet(currentId);
   if (!entry) { showToast('记录不存在'); return; }
 
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  // iOS: open the window IMMEDIATELY inside the click handler
+  // before any async work, otherwise Safari blocks the popup
+  let iosWin = null;
+  if (isIOS) {
+    iosWin = window.open('', '_blank');
+    if (iosWin) {
+      iosWin.document.write(`
+        <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>私语长图</title>
+        <style>
+          body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}
+          .hint{color:#888;font-size:14px;margin-top:16px;text-align:center;padding:0 20px;line-height:1.6}
+          .loading{color:#666;font-size:13px;margin-top:40px}
+        </style></head><body>
+        <div class="loading">⏳ 正在生成长图...</div>
+        </body></html>`);
+      iosWin.document.close();
+    } else {
+      showToast('请在 Safari 设置中允许弹出窗口');
+      return;
+    }
+  }
+
   // fill export canvas header
   document.getElementById('ec-person').textContent = entry.person;
   document.getElementById('ec-date').textContent = `📅 ${entry.date}`;
@@ -1253,7 +1278,6 @@ async function exportImage() {
   const bodyContainer = document.getElementById('ec-body-container');
   bodyContainer.innerHTML = '';
 
-  // build DOM nodes and wait for images to load
   const imageLoadPromises = [];
   paras.forEach(p => {
     if (p.type === 'photo' && p.content) {
@@ -1291,43 +1315,38 @@ async function exportImage() {
       windowWidth: 900,
     });
 
-    // iOS Safari does not support <a download>, so we open a new tab with the image
-    // The user can then long-press → Save to Photos
     const dataURL = canvas.toDataURL('image/png');
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
     if (isIOS) {
-      // Open image in new tab for iOS long-press save
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`
-          <html><head><meta name="viewport" content="width=device-width">
-          <title>私语长图 · ${entry.person}</title>
-          <style>body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px}
-          img{max-width:100%;border-radius:8px}
-          p{color:#888;font-size:13px;margin-top:14px;font-family:sans-serif;text-align:center}
+      if (iosWin && !iosWin.closed) {
+        // write the actual image into the already-open window
+        iosWin.document.open();
+        iosWin.document.write(`
+          <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>私语长图 · ${escHtml(entry.person)}</title>
+          <style>
+            body{margin:0;background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;gap:0}
+            img{max-width:100%;border-radius:8px;display:block}
+            .hint{color:#888;font-size:13px;margin-top:14px;text-align:center;line-height:1.7;padding:0 16px}
           </style></head><body>
           <img src="${dataURL}" alt="私语长图">
-          <p>长按图片 → 存储到照片</p>
+          <p class="hint">长按图片 → 存储到照片</p>
           </body></html>`);
-        win.document.close();
-      } else {
-        showToast('请允许弹出窗口以保存图片');
+        iosWin.document.close();
+        showToast('长按图片保存到相册 ✓');
       }
     } else {
-      // Android / desktop: direct download
       const a = document.createElement('a');
       a.href = dataURL;
       a.download = `私语_${entry.person}_${entry.date}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      showToast('长图已下载 ✓');
     }
-
-    showToast(isIOS ? '长按图片保存到相册 ✓' : '长图已下载 ✓');
   } catch(err) {
     console.error('Export error:', err);
+    if (iosWin && !iosWin.closed) iosWin.close();
     showToast('生成失败，请重试');
   } finally {
     document.getElementById('loading').classList.remove('show');
